@@ -1,0 +1,91 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+model User {
+    id        Int      @id @default(autoincrement())
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    email String @unique
+    hash  String
+
+    firstName String?
+    lastName  String?
+
+    poast    Post[]
+    comments Comment[]
+    likes    Like[]
+
+    @@map("users")
+}
+
+model Post {
+    id        Int      @id @default(autoincrement())
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    title     String
+    content   String  @db.Text
+    thumbnail String?
+
+    authorId Int
+    author   User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+    tags Tag[]
+
+    comments Comment[]
+    likes    Like[]
+
+    @@unique([id, authorId])
+    @@index([createdAt(sort: Desc)])
+    @@map("posts")
+}
+
+model Tag {
+    id        Int      @id @default(autoincrement())
+    name      String   @unique
+    createdAt DateTime @default(now())
+
+    pots Post[]
+
+    @@map("tags")
+}
+
+model Comment {
+    id        Int      @id @default(autoincrement())
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    content String @db.Text
+
+    authorId Int
+    author   User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+    postId Int
+    post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+    @@unique([id, authorId])
+    @@index([postId])
+    @@map("comments")
+}
+
+model Like {
+    id        Int      @id @default(autoincrement())
+    createdAt DateTime @default(now())
+
+    userId Int
+    user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    postId Int
+    post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, postId])
+    @@index([postId])
+    @@map("likes")
+}
