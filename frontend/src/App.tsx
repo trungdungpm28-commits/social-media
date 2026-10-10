@@ -1,62 +1,47 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { AuthProvider } from './auth/AuthProvider';
+import { useAuth } from './auth/useAuth';
 import { AuthPage } from './pages/AuthPage';
-import { authApi } from './api/authApi';
-import type { UserProfile } from './types/auth.types';
 import { Navbar } from './components/Navbar';
 import { HomePage } from './pages/HomePage';
-import axios from 'axios';
 
-export default function App() {
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [checkingAuth, setCheckingAuth] = useState(() =>
-    Boolean(localStorage.getItem('access_token')),
-  );
+const AppContent = () => {
+  const { user, isLoading, signOut } = useAuth();
+  const [composerOpen, setComposerOpen] = useState(false);
 
-  const fetchProfile = async () => {
-    try {
-      // Lấy thông tin user hiện tại
-      const profile = await authApi.getMe();
-      setCurrentUser(profile);
-    } catch (error) {
-      setCurrentUser(null);
-      if (axios.isAxiosError(error) && [401, 403].includes(error.response?.status ?? 0)) {
-        authApi.logout();
-      }
-    } finally {
-      setCheckingAuth(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    authApi.logout();
-    setCurrentUser(null);
-  };
-
-  useEffect(() => {
-    if (localStorage.getItem('access_token')) {
-      void Promise.resolve().then(fetchProfile);
-    }
-  }, []);
-
-  // Đang kiểm tra trạng thái đăng nhập
-  if (checkingAuth) {
+  if (isLoading) {
     return (
-      <main className="auth-checking" aria-live="polite">
-        Checking authentication...
+      <main className="flex min-h-screen items-center justify-center bg-[#f4f5fb] text-sm font-medium text-slate-500" aria-live="polite">
+        Checking your session…
       </main>
     );
   }
 
-  // Chưa đăng nhập => hiển thị trang đăng nhập / đăng ký
-  if (!currentUser) {
-    return <AuthPage onLoginSuccess={fetchProfile} />;
+  if (!user) {
+    return <AuthPage />;
   }
 
-  // Đã đăng nhập => hiển thị trang chính
   return (
     <>
-      <Navbar user={currentUser} onLogout={handleLogout} />
-      <HomePage user={currentUser} />
+      <Navbar
+        user={user}
+        onLogout={signOut}
+        onCreatePost={() => setComposerOpen(true)}
+      />
+      <HomePage
+        user={user}
+        composerOpen={composerOpen}
+        onOpenComposer={() => setComposerOpen(true)}
+        onCloseComposer={() => setComposerOpen(false)}
+      />
     </>
+  );
+};
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }

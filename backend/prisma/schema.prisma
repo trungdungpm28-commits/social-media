@@ -18,7 +18,7 @@ model User {
     firstName String?
     lastName  String?
 
-    poast    Post[]
+    posts    Post[]
     comments Comment[]
     likes    Like[]
 
@@ -52,7 +52,7 @@ model Tag {
     name      String   @unique
     createdAt DateTime @default(now())
 
-    pots Post[]
+    posts Post[]
 
     @@map("tags")
 }

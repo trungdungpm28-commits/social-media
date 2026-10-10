@@ -1,26 +1,69 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePostDto, EditPostDto } from './dto';
-import { create } from 'node:domain';
-import { PrismaClient } from '@prisma/client/extension';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-import { throwError } from 'rxjs';
 
 const hashtagRegex = /(?:^|\s)#([a-zA-Z0-9_]+)/g;
 
 @Injectable()
 export class PostService {
   constructor(private prisma: PrismaService) {}
-  getAllPosts() {
-    return this.prisma.post.findMany({ orderBy: { createdAt: 'desc' } });
+  getAllPosts(userId: number) {
+    return this.prisma.post.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        author: {
+          select: { id: true, email: true, firstName: true, lastName: true },
+        },
+        comments: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            author: {
+              select: { id: true, email: true, firstName: true, lastName: true },
+            },
+          },
+        },
+        _count: { select: { likes: true } },
+        likes: { where: { userId }, select: { id: true } },
+      },
+    });
   }
 
-  getPostById(postId: number) {
-    return this.prisma.post.findMany({ where: { id: postId } });
+  async getPostById(postId: number) {
+    const post = await this.prisma.post.findUnique({
+      where: { id: postId },
+      include: {
+        author: {
+          select: { id: true, email: true, firstName: true, lastName: true },
+        },
+        comments: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            author: {
+              select: { id: true, email: true, firstName: true, lastName: true },
+            },
+          },
+        },
+        _count: { select: { likes: true } },
+      },
+    });
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+    return post;
   }
 
   async createPost(userId: number, dto: CreatePostDto) {
-    const matches = dto.content.matchAll(hashtagRegex);
+    const content = dto.content.trim();
+    if (!content) {
+      throw new BadRequestException('Post content cannot be empty');
+    }
+    const matches = content.matchAll(hashtagRegex);
 
     const tagNames = Array.from(
       new Set(Array.from(matches, (m) => m[1].toLocaleLowerCase())),
@@ -29,8 +72,8 @@ export class PostService {
     return await this.prisma.post.create({
       data: {
         authorId: userId,
-        title: dto.title,
-        content: dto.content,
+        title: dto.title?.trim() || content.slice(0, 80),
+        content,
         thumbnail: dto.thumbnail,
         tags: {
           connectOrCreate: tagNames.map((name) => ({
@@ -41,17 +84,22 @@ export class PostService {
       },
       include: {
         tags: true,
+        author: {
+          select: { id: true, email: true, firstName: true, lastName: true },
+        },
+        comments: true,
+        _count: { select: { likes: true } },
       },
     });
   }
 
   async editPostById(userId: number, postId: number, dto: EditPostDto) {
-    const matches = dto.content.matchAll(hashtagRegex);
+    const matches = (dto.content ?? '').matchAll(hashtagRegex);
     const tagNames = Array.from(
       new Set(Array.from(matches, (m) => m[1].toLocaleLowerCase())),
     );
     try {
-      return this.prisma.post.update({
+      return await this.prisma.post.update({
         where: {
           id_authorId: {
             id: postId,
@@ -60,15 +108,19 @@ export class PostService {
         },
         data: {
           authorId: userId,
-          title: dto.title,
-          content: dto.content,
+          title: dto.title?.trim(),
+          content: dto.content?.trim(),
           thumbnail: dto.thumbnail,
           tags: {
-            set: [],
-            connectOrCreate: tagNames.map((name) => ({
-              where: { name },
-              create: { name },
-            })),
+            ...(dto.content === undefined
+              ? {}
+              : {
+                  set: [],
+                  connectOrCreate: tagNames.map((name) => ({
+                    where: { name },
+                    create: { name },
+                  })),
+                }),
           },
         },
         include: {

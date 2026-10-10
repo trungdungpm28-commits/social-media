@@ -15,16 +15,14 @@ import { JwtGuard } from '../auth/guard';
 import { CommentService } from './comment.service';
 import { GetUser } from '../auth/decorator';
 import { CreateCommentDto, EditCommentDto } from './dto ';
-import { dot } from 'node:test/reporters';
-import { Prisma } from '@prisma/client';
 
 @UseGuards(JwtGuard)
 @Controller('comment')
 export class CommentController {
   constructor(private commentservice: CommentService) {}
 
-  @Get('postid')
-  getCommentByPostId(@Param('postid', ParseIntPipe) postId: number) {
+  @Get('post/:postId')
+  getCommentByPostId(@Param('postId', ParseIntPipe) postId: number) {
     return this.commentservice.getCommentByPostId(postId);
   }
 
@@ -40,10 +38,10 @@ export class CommentController {
   @Patch(':id')
   editCommentById(
     @GetUser('id') userId: number,
-    @Body() dto: EditCommentDto,
     @Param('id', ParseIntPipe) commentId,
+    @Body() dto: EditCommentDto,
   ) {
-    return this.commentservice.editCommentById(userId, commentId,dto);
+    return this.commentservice.editCommentById(userId, commentId, dto);
   }
 
   @HttpCode(HttpStatus.NO_CONTENT)

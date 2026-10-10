@@ -13,7 +13,6 @@ import {
 import { JwtGuard } from '../auth/guard';
 import { LikeService } from './like.service';
 import { GetUser } from '../auth/decorator';
-import { userInfo } from 'node:os';
 
 @UseGuards(JwtGuard)
 @Controller('like')
